@@ -2,6 +2,15 @@ import React, {useEffect, useState} from 'react';
 import {TICKET_STATUS} from '@/pages/constants';
 import TaskFormModal from '../TaskFormModal';
 
+/**
+ * Renders a modal for updating a ticket.
+ *
+ * @param isOpen - Indicates whether the modal is open or not.
+ * @param onClose - Callback function to close the modal.
+ * @param ticketId - The ID of the ticket to be updated.
+ * @param updateTicket - Callback function to update the ticket.
+ * @returns The JSX element representing the update ticket form modal.
+ */
 function UpdateTicketFormModal({
                                    isOpen,
                                    onClose,

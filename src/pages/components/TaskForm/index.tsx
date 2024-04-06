@@ -3,8 +3,12 @@
 import {TICKET_STATUS} from '@/pages/constants';
 import React, {useState} from 'react';
 
+/**
+ * Renders a form for creating a new task.
+ * @param onClose - Function to close the form.
+ * @param ticketId - ID of the ticket associated with the task.
+ */
 export default function TaskForm({onClose, ticketId}: { onClose: any, ticketId: number }) {
-    // Form state
     const [formData, setFormData] = useState({
         title: '',
         description: '',
@@ -13,7 +17,6 @@ export default function TaskForm({onClose, ticketId}: { onClose: any, ticketId: 
         ticketId: ticketId
     });
 
-    // Update form data on input change
     const handleChange = (e: { target: { name: any; value: any; }; }) => {
         const {name, value} = e.target;
         setFormData(prevFormData => ({
@@ -41,13 +44,10 @@ export default function TaskForm({onClose, ticketId}: { onClose: any, ticketId: 
             }
 
             const result = await response.json();
-            // Clear the form fields if needed
             setFormData({ticketId: 0, title: '', description: '', owner: '', status: TICKET_STATUS.TODO});
 
-            // Call the function to close the modal
             onClose();
         } catch (error) {
-            // Handle errors - show to the user, etc.
             console.error('Failed to submit the form: ', error);
         }
     };

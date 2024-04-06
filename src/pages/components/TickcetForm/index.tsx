@@ -1,6 +1,10 @@
 import {TICKET_STATUS} from "@/pages/constants";
 import {useState} from "react";
 
+/**
+ * Renders a form for adding a ticket.
+ * @param onClose - Function to close the form.
+ */
 export default function TicketForm({onClose}: { onClose: any }) {
     const [formData, setFormData] = useState({
         title: "",

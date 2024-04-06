@@ -2,6 +2,11 @@ export interface DateFilterProps {
     handleDateChange: (date: Date | null) => void;
 }
 
+/**
+ * A component that allows the user to select a start and end date for filtering.
+ *
+ * @param handleDateChange - A function to handle the date change event.
+ */
 export default function DateFilter({handleDateChange}: DateFilterProps) {
     const handleFilterClick = () => {
         // Call handleDateChange with the selected dates

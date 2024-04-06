@@ -2,6 +2,12 @@
 
 import TicketForm from "@/pages/components/TickcetForm";
 
+/**
+ * Renders a modal component for a ticket form.
+ * @param isOpen - A boolean indicating whether the modal is open or not.
+ * @param onClose - A function to be called when the modal is closed.
+ * @returns The JSX element representing the ticket form modal.
+ */
 const TicketFormModal = ({isOpen, onClose}: { isOpen: boolean, onClose: () => void }) => {
     if (!isOpen) return null;
 
