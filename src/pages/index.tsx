@@ -1,118 +1,194 @@
-import Image from "next/image";
-import { Inter } from "next/font/google";
+import React, {useEffect, useState} from 'react';
+import {Ticket as TicketType} from '@prisma/client';
+import DateFilter from './components/DateFilter';
+import TicketFormModal from "@/pages/components/TicketFormModal";
+import {DragDropContext} from '@hello-pangea/dnd';
+import {AddTicketButton} from './components/AddTicketButton';
+import {KanbanColumn} from './components/KanbanColumn';
+import {TicketDraggable} from './components/TicketDraggable';
+import {TICKET_STATUS} from './constants';
+import UpdateTicketFormModal from './components/UpdateTicketFormModal';
+import {useRouter} from 'next/router';
 
-const inter = Inter({ subsets: ["latin"] });
 
 export default function Home() {
-  return (
-    <main
-      className={`flex min-h-screen flex-col items-center justify-between p-24 ${inter.className}`}
-    >
-      <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing&nbsp;
-          <code className="font-mono font-bold">src/pages/index.tsx</code>
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:h-auto lg:w-auto lg:bg-none">
-          <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{" "}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
+    const [tickets, setTickets] = useState<TicketType[]>([]);
+    const [isTaskFormVisible, setTaskFormVisible] = useState(false);
+    const router = useRouter();
+    const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+    const openTaskForm = () => {
+        setTaskFormVisible(true);
+    };
+    const closeTaskForm = () => {
+        setTaskFormVisible(false);
+        router.reload();
+    };
+
+    const [selectedTicketId, setSelectedTicketId] = useState(0);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+
+    const handleDateChange = (date: Date | null) => {
+        const filteredTickets = selectedDate
+            ? tickets.filter(ticket => new Date(ticket.dueDate).toDateString() === selectedDate.toDateString())
+            : tickets;
+        setTickets(filteredTickets);
+        setSelectedDate(date);
+    };
+
+    const openModal = (ticketId: number) => {
+        setSelectedTicketId(ticketId);
+        setIsModalOpen(true);
+    };
+
+    const closeModal = () => {
+        setIsModalOpen(false);
+    };
+
+    const updateTicketInState = (ticketId: any, updatedDetails: any) => {
+        const updatedTickets = tickets.map((ticket) => {
+            if (ticket.id === ticketId) {
+                return {
+                    ...ticket,
+                    ...updatedDetails,
+                };
+            }
+            console.log("update ticket");
+            return ticket;
+        });
+        setTickets(updatedTickets);
+    };
+
+
+    useEffect(() => {
+        async function fetchTickets() {
+            const response = await fetch('/api/tickets');
+            const data = await response.json();
+            setTickets(data);
+        }
+
+        fetchTickets();
+    }, []);
+
+    const [columns, setColumns] = useState<{
+        todo: JSX.Element[];
+        inProgress: JSX.Element[];
+        bug: JSX.Element[];
+        done: JSX.Element[];
+    }>({
+        todo: [],
+        inProgress: [],
+        bug: [],
+        done: [],
+    });
+
+    useEffect(() => {
+        const todoTickets = tickets
+            .filter((ticket) => ticket.status === TICKET_STATUS.TODO)
+            .map((ticket, index) => (
+                <TicketDraggable key={ticket.id} ticket={ticket} index={index} openModal={openModal}/>
+            ));
+        const bugTickets = tickets
+            .filter((ticket) => ticket.status === TICKET_STATUS.BUG)
+            .map((ticket, index) => (
+                <TicketDraggable key={ticket.id} ticket={ticket} index={index} openModal={openModal}/>
+            ));
+        const inProgressTickets = tickets
+            .filter((ticket) => ticket.status === TICKET_STATUS.IN_PROGRESS)
+            .map((ticket, index) => (
+                <TicketDraggable key={ticket.id} ticket={ticket} index={index} openModal={openModal}/>
+            ));
+        const doneTickets = tickets
+            .filter((ticket) => ticket.status === TICKET_STATUS.DONE)
+            .map((ticket, index) => (
+                <TicketDraggable key={ticket.id} ticket={ticket} index={index} openModal={openModal}/>
+            ));
+
+        setColumns({
+            todo: todoTickets,
+            inProgress: inProgressTickets,
+            bug: bugTickets,
+            done: doneTickets,
+        });
+    }, [tickets]);
+
+
+    const onDragEnd = async (result: { destination: any; source: any; draggableId: any; }) => {
+
+        const {destination, source, draggableId} = result;
+        if (!destination) {
+            return;
+        }
+
+        if (
+            destination.droppableId === source.droppableId &&
+            destination.index === source.index
+        ) {
+            return;
+        }
+
+        const updatedTickets = Array.from(tickets);
+        const [removed] = updatedTickets.splice(source.index, 1);
+        if (removed) {
+            updatedTickets.splice(destination.index, 0, removed);
+            removed.status = destination.droppableId;
+            await fetch(`/api/tickets/${draggableId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({status: destination.droppableId}),
+            });
+            setTickets(updatedTickets);
+            //TODO - I know this is not the best way to fix the problem for the droping the ticket, but I'm tired and I need to sleep
+            router.reload();
+        }
+    };
+
+
+    return (
+        <>
+            <UpdateTicketFormModal
+                isOpen={isModalOpen}
+                onClose={closeModal}
+                ticketId={selectedTicketId}
+                updateTicket={updateTicketInState}
             />
-          </a>
-        </div>
-      </div>
+            <DragDropContext onDragEnd={onDragEnd}>
+                <div className="container mx-auto p-4  text-gray-700">
+                    <DateFilter handleDateChange={handleDateChange}/>
+                    <AddTicketButton openTaskForm={openTaskForm}/>
+                    <TicketFormModal isOpen={isTaskFormVisible} onClose={closeTaskForm}/>
+                    {Board(columns)}
+                </div>
+            </DragDropContext>
 
-      <div className="relative flex place-items-center before:absolute before:h-[300px] before:w-full sm:before:w-[480px] before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-full sm:after:w-[240px] after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700/10 after:dark:from-sky-900 after:dark:via-[#0141ff]/40 before:lg:h-[360px]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
+        </>
 
-      <div className="mb-32 grid text-center lg:max-w-5xl lg:w-full lg:mb-0 lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Docs{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Learn{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Templates{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Discover and deploy boilerplate example Next.js&nbsp;projects.
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Deploy{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50 text-balance`}>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
-  );
+    );
 }
+
+function Board(columns: { todo: JSX.Element[]; inProgress: JSX.Element[]; bug: JSX.Element[]; done: JSX.Element[]; }) {
+    return <div className="kanban-board">
+        <KanbanColumn title="To Do" droppableId={TICKET_STATUS.TODO}>
+            <div>
+                {columns.todo}
+            </div>
+        </KanbanColumn>
+        <KanbanColumn title="In Progress" droppableId={TICKET_STATUS.IN_PROGRESS}>
+            <div>
+                {columns.inProgress}
+            </div>
+        </KanbanColumn>
+        <KanbanColumn title="Bugs" droppableId={TICKET_STATUS.BUG}>
+            <div>
+                {columns.bug}
+            </div>
+        </KanbanColumn>
+        <KanbanColumn title="Done" droppableId={TICKET_STATUS.DONE}>
+            <div>
+                {columns.done}
+            </div>
+        </KanbanColumn>
+    </div>;
+}
+
